@@ -4,6 +4,9 @@
    NUMERO DE WHATSAPP DE GAMMA MARKET (Ecuador). Solo digitos, sin + ni espacios.
 ================================================================ */
 const WHATSAPP = '5493853010314'; // GAMMA MARKET
+const API = 'https://gamma-market-api.gammasg.workers.dev';
+let authToken = localStorage.getItem('gm_token') || '';
+let currentUser = null;
 
 const PROVINCIAS = ['Azuay','Bolívar','Cañar','Carchi','Chimborazo','Cotopaxi','El Oro','Esmeraldas','Galápagos','Guayas','Imbabura','Loja','Los Ríos','Manabí','Morona Santiago','Napo','Orellana','Pastaza','Pichincha','Santa Elena','Santo Domingo de los Tsáchilas','Sucumbíos','Tungurahua','Zamora Chinchipe'];
 
@@ -117,25 +120,98 @@ function fillProvincias() {
   PROVINCIAS.forEach((pr) => sel.append(el('option', { value: pr, text: pr })));
 }
 
-function confirmOrder() {
+async function confirmOrder() {
+  if (!currentUser) { openAuth(true); return; } // hay que estar logueado para comprar
   const form = $('#checkout');
   if (!form.reportValidity()) return;
-  if (!WHATSAPP) { console.warn('Falta WHATSAPP'); return; }
-  let total = 0, msg = '*NUEVO PEDIDO — GAMMA MARKET*\n\n*Productos:*\n';
+  const f = new FormData(form);
+
+  let total = 0; const items = [];
   cart.forEach((c) => {
     const p = byId(c.id); if (!p) return;
     total += p.price * c.qty;
-    msg += '- ' + p.name + (c.variant ? ' (' + c.variant + ')' : '') + ' x' + c.qty + ' — ' + money(p.price * c.qty) + '\n';
+    items.push({ name: p.name, variant: c.variant || null, qty: c.qty, price: p.price });
   });
-  const f = new FormData(form);
+  const shipping = {
+    telefono: f.get('telefono'), provincia: f.get('provincia'), ciudad: f.get('ciudad'),
+    direccion: f.get('direccion'), referencia: (f.get('referencia') || '').trim(),
+  };
+
+  const btn = $('#confirmBtn'); btn.disabled = true;
+  try {
+    await fetch(API + '/order', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + authToken },
+      body: JSON.stringify({ items, total, ...shipping }),
+    });
+  } catch (e) { console.error('no se guardó el pedido en la cuenta', e); }
+  btn.disabled = false;
+
+  let msg = '*NUEVO PEDIDO — GAMMA MARKET*\n\n*Productos:*\n';
+  items.forEach((it) => { msg += '- ' + it.name + (it.variant ? ' (' + it.variant + ')' : '') + ' x' + it.qty + ' — ' + money(it.price * it.qty) + '\n'; });
   msg += '\n*Total: ' + money(total) + '* (pago contra entrega)\n\n*Datos del cliente:*\n';
-  msg += 'Nombre: ' + f.get('nombre') + '\n';
-  msg += 'Teléfono: ' + f.get('telefono') + '\n';
-  msg += 'Provincia: ' + f.get('provincia') + '\n';
-  msg += 'Ciudad: ' + f.get('ciudad') + '\n';
-  msg += 'Dirección: ' + f.get('direccion') + '\n';
-  const ref = (f.get('referencia') || '').trim(); if (ref) msg += 'Referencia: ' + ref + '\n';
+  msg += 'Nombre: ' + (currentUser.nombre || f.get('nombre')) + '\n';
+  msg += 'Email: ' + currentUser.email + '\n';
+  msg += 'Teléfono: ' + shipping.telefono + '\n';
+  msg += 'Provincia: ' + shipping.provincia + '\n';
+  msg += 'Ciudad: ' + shipping.ciudad + '\n';
+  msg += 'Dirección: ' + shipping.direccion + '\n';
+  if (shipping.referencia) msg += 'Referencia: ' + shipping.referencia + '\n';
   window.open('https://wa.me/' + WHATSAPP + '?text=' + encodeURIComponent(msg), '_blank');
+}
+
+// ---------- Cuenta / auth ----------
+function updateAuthUI() {
+  const name = $('#accountName');
+  name.textContent = currentUser ? (currentUser.nombre || 'Mi cuenta').split(' ')[0] : 'Ingresar';
+}
+function prefillCheckout() {
+  if (!currentUser) return;
+  const form = $('#checkout'); if (!form) return;
+  const set = (n, v) => { const el = form.querySelector('[name="' + n + '"]'); if (el && v && !el.value) el.value = v; };
+  set('nombre', currentUser.nombre); set('telefono', currentUser.telefono);
+  set('provincia', currentUser.provincia); set('ciudad', currentUser.ciudad);
+  set('direccion', currentUser.direccion); set('referencia', currentUser.referencia);
+}
+function openAuth(pending) {
+  window.__authPending = !!pending;
+  $('#authModal').hidden = false; $('#authOverlay').hidden = false; document.body.style.overflow = 'hidden';
+}
+function closeAuth() {
+  $('#authModal').hidden = true; $('#authOverlay').hidden = true; document.body.style.overflow = '';
+}
+function showTab(which) {
+  const login = which === 'login';
+  $('#tabLogin').classList.toggle('is-active', login);
+  $('#tabRegister').classList.toggle('is-active', !login);
+  $('#loginForm').hidden = !login;
+  $('#registerForm').hidden = login;
+}
+function onAuthSuccess(data) {
+  authToken = data.token; currentUser = data.user;
+  localStorage.setItem('gm_token', authToken);
+  updateAuthUI(); closeAuth(); prefillCheckout();
+  if (window.__authPending) { window.__authPending = false; openCart(); }
+}
+function logout() {
+  authToken = ''; currentUser = null; localStorage.removeItem('gm_token'); updateAuthUI();
+}
+async function apiAuth(path, body, errEl) {
+  errEl.hidden = true;
+  try {
+    const r = await fetch(API + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const data = await r.json();
+    if (!r.ok) { errEl.textContent = data.error || 'Error'; errEl.hidden = false; return; }
+    onAuthSuccess(data);
+  } catch (e) { errEl.textContent = 'No se pudo conectar. Reintentá.'; errEl.hidden = false; }
+}
+async function loadSession() {
+  if (!authToken) { updateAuthUI(); return; }
+  try {
+    const r = await fetch(API + '/me', { headers: { Authorization: 'Bearer ' + authToken } });
+    if (r.ok) { currentUser = (await r.json()).user; } else { logout(); }
+  } catch (e) { /* offline: mantengo el token */ }
+  updateAuthUI(); prefillCheckout();
 }
 
 // ---- Init ----
@@ -144,8 +220,27 @@ $('#closeCart').addEventListener('click', closeCart);
 $('#overlay').addEventListener('click', closeCart);
 $('#confirmBtn').addEventListener('click', confirmOrder);
 $('#search').addEventListener('input', (e) => { query = e.target.value.trim().toLowerCase(); renderGrid(); });
+
+// cuenta
+$('#accountBtn').addEventListener('click', () => { if (currentUser) logout(); else { showTab('login'); openAuth(false); } });
+$('#authClose').addEventListener('click', closeAuth);
+$('#authOverlay').addEventListener('click', closeAuth);
+$('#tabLogin').addEventListener('click', () => showTab('login'));
+$('#tabRegister').addEventListener('click', () => showTab('register'));
+$('#loginForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const f = new FormData(e.target);
+  apiAuth('/login', { email: f.get('email'), password: f.get('password') }, $('#loginError'));
+});
+$('#registerForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const f = new FormData(e.target);
+  apiAuth('/register', { nombre: f.get('nombre'), email: f.get('email'), password: f.get('password'), telefono: f.get('telefono') }, $('#registerError'));
+});
+
 fillProvincias();
 renderCart();
+loadSession();
 fetch('productos.json')
   .then((r) => r.json())
   .then((data) => { PRODUCTS = data; renderGrid(); })

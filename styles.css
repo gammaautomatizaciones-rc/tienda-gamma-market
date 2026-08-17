@@ -162,7 +162,32 @@ a{color:inherit;text-decoration:none}
 .wa-btn:disabled{background:var(--zinc-200);color:var(--zinc-400);cursor:not-allowed}
 .wa-btn svg{width:22px;height:22px}
 
+/* ---------- Cuenta / auth ---------- */
+.topbar-actions{display:flex;align-items:center;gap:6px}
+.account-btn{display:flex;align-items:center;gap:7px;background:transparent;border:none;color:var(--white);cursor:pointer;padding:8px 10px;border-radius:var(--radius);font-family:inherit;font-weight:700;font-size:14px}
+.account-btn:hover{background:var(--zinc-900)}
+.account-btn svg{width:22px;height:22px}
+#accountName{max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.auth-modal{position:fixed;z-index:50;top:50%;left:50%;transform:translate(-50%,-50%);
+  width:min(400px,calc(100% - 32px));background:var(--white);border-radius:var(--radius);
+  padding:24px;box-shadow:0 12px 40px rgba(0,0,0,.2)}
+.auth-close{position:absolute;top:12px;right:12px}
+.auth-tabs{display:flex;gap:8px;margin-bottom:20px;border-bottom:1px solid var(--zinc-200)}
+.auth-tab{flex:1;background:transparent;border:none;cursor:pointer;font-family:inherit;font-weight:900;
+  font-size:15px;color:var(--zinc-400);padding:10px 0 14px;border-bottom:3px solid transparent;margin-bottom:-1px}
+.auth-tab.is-active{color:var(--zinc-900);border-bottom-color:var(--yellow)}
+.auth-form{display:flex;flex-direction:column;gap:14px}
+.auth-form label{display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:700;color:var(--zinc-600)}
+.auth-form input{font-family:inherit;font-size:15px;color:var(--zinc-900);border:1px solid var(--zinc-200);
+  border-radius:8px;padding:11px 12px;background:var(--white)}
+.auth-form input:focus{outline:2px solid var(--yellow);outline-offset:0;border-color:transparent}
+.auth-submit{margin-top:4px}
+.auth-error{color:#ef4444;font-size:13px;font-weight:700;margin:0}
+.login-note{font-size:12px;color:var(--zinc-500);margin:0 0 10px;text-align:center}
+
 @media (max-width:520px){
   .card-img{height:180px}
   .hero{padding:32px 0 30px}
+  #accountName{display:none}
 }
