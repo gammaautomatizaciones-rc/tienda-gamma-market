@@ -8,6 +8,7 @@ const WHATSAPP = '5493853010314'; // GAMMA MARKET
 const PROVINCIAS = ['Azuay','Bolívar','Cañar','Carchi','Chimborazo','Cotopaxi','El Oro','Esmeraldas','Galápagos','Guayas','Imbabura','Loja','Los Ríos','Manabí','Morona Santiago','Napo','Orellana','Pastaza','Pichincha','Santa Elena','Santo Domingo de los Tsáchilas','Sucumbíos','Tungurahua','Zamora Chinchipe'];
 
 let PRODUCTS = [];
+let query = '';
 const cart = []; // { id, variant, qty }
 
 const $ = (s) => document.querySelector(s);
@@ -43,7 +44,8 @@ const byId = (id) => PRODUCTS.find((p) => p.id === id);
 function renderGrid() {
   const grid = $('#grid');
   grid.replaceChildren();
-  PRODUCTS.forEach((p) => {
+  const list = query ? PRODUCTS.filter((p) => p.name.toLowerCase().includes(query)) : PRODUCTS;
+  list.forEach((p) => {
     const body = el('div', { class: 'card-body' },
       el('div', { class: 'card-name', text: p.name }),
       el('div', { class: 'card-price' }, money(p.price), ' ', el('small', { text: 'USD' })),
@@ -68,7 +70,7 @@ function renderGrid() {
     if (p.img) imgWrap.append(el('img', { src: p.img, alt: p.name, loading: 'lazy' }));
     grid.append(el('div', { class: 'card' }, imgWrap, body));
   });
-  $('#prodCount').textContent = PRODUCTS.length + ' productos';
+  $('#prodCount').textContent = list.length + ' de ' + PRODUCTS.length + ' productos';
 }
 
 // ---- Carrito ----
@@ -141,6 +143,7 @@ $('#cartBtn').addEventListener('click', openCart);
 $('#closeCart').addEventListener('click', closeCart);
 $('#overlay').addEventListener('click', closeCart);
 $('#confirmBtn').addEventListener('click', confirmOrder);
+$('#search').addEventListener('input', (e) => { query = e.target.value.trim().toLowerCase(); renderGrid(); });
 fillProvincias();
 renderCart();
 fetch('productos.json')

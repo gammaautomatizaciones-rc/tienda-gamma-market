@@ -71,6 +71,9 @@ a{color:inherit;text-decoration:none}
 .section-head{display:flex;align-items:baseline;gap:12px;margin:40px 0 20px;flex-wrap:wrap}
 .section-head .section-title{margin:0}
 .prod-count{font-size:14px;font-weight:700;color:var(--zinc-500)}
+.search{margin-left:auto;font-family:inherit;font-size:15px;padding:10px 14px;border:1px solid var(--zinc-200);border-radius:10px;min-width:240px;background:var(--white);color:var(--zinc-900)}
+.search:focus{outline:2px solid var(--yellow);border-color:transparent}
+@media (max-width:560px){.search{margin-left:0;width:100%;min-width:0}}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:20px;padding-bottom:56px}
 
 .card{
