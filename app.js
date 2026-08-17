@@ -217,6 +217,7 @@ async function loadSession() {
 // ---- Init ----
 $('#cartBtn').addEventListener('click', openCart);
 $('#closeCart').addEventListener('click', closeCart);
+$('#keepShopping').addEventListener('click', closeCart);
 $('#overlay').addEventListener('click', closeCart);
 $('#confirmBtn').addEventListener('click', confirmOrder);
 $('#search').addEventListener('input', (e) => { query = e.target.value.trim().toLowerCase(); renderGrid(); });
