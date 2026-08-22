@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>GAMMA MARKET — Panel de pedidos</title>
+<style>
+  :root{--black:#0a0a0a;--yellow:#FFEB3B;--wa:#25D366;--zinc-100:#f4f4f5;--zinc-200:#e4e4e7;--zinc-400:#a1a1aa;--zinc-500:#71717a;--zinc-600:#52525b;--zinc-900:#18181b}
+  *{box-sizing:border-box;margin:0;padding:0}
+  [hidden]{display:none!important}
+  body{font-family:'Montserrat',system-ui,sans-serif;background:#fafafa;color:var(--zinc-900);line-height:1.5}
+  header{background:var(--black);border-bottom:3px solid var(--yellow);padding:14px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:5}
+  .brand{font-weight:900;font-size:20px;color:#fff;text-transform:uppercase}
+  .brand span{color:var(--yellow);margin-left:4px}
+  .head-actions{display:flex;gap:8px;align-items:center}
+  .badge{background:var(--yellow);color:var(--black);font-weight:900;font-size:13px;padding:4px 10px;border-radius:999px}
+  button{font-family:inherit;cursor:pointer}
+  .btn{border:none;font-weight:900;font-size:13px;padding:8px 12px;border-radius:8px}
+  .btn-ghost{background:transparent;color:#fff;border:1px solid var(--zinc-600)}
+  .wrap{max-width:820px;margin:0 auto;padding:20px}
+  /* login */
+  .login{max-width:360px;margin:80px auto;background:#fff;border:1px solid var(--zinc-200);border-radius:12px;padding:28px;text-align:center}
+  .login h1{font-size:20px;font-weight:900;margin-bottom:16px}
+  .login input{width:100%;font-family:inherit;font-size:15px;padding:11px 12px;border:1px solid var(--zinc-200);border-radius:8px;margin-bottom:12px}
+  .login .btn-primary{width:100%;background:var(--black);color:#fff}
+  .login .err{color:#ef4444;font-size:13px;font-weight:700;margin-top:10px}
+  /* filtros */
+  .filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+  .chip{background:#fff;border:1px solid var(--zinc-200);color:var(--zinc-600);font-weight:700;font-size:13px;padding:7px 14px;border-radius:999px}
+  .chip.is-active{background:var(--zinc-900);color:#fff;border-color:var(--zinc-900)}
+  /* pedido */
+  .order{background:#fff;border:1px solid var(--zinc-200);border-radius:12px;padding:16px;margin-bottom:14px}
+  .o-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+  .o-id{font-weight:900;font-size:16px}
+  .o-date{font-size:12px;color:var(--zinc-400)}
+  .o-total{font-weight:900;font-size:18px}
+  .o-data{background:var(--zinc-100);border-radius:8px;padding:12px;font-size:14px;margin-bottom:10px}
+  .o-data b{font-weight:900}
+  .o-data .row{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+  .o-items{font-size:13px;color:var(--zinc-600);margin-bottom:12px}
+  .o-items div{padding:2px 0}
+  .o-copy{background:transparent;border:1px solid var(--zinc-200);color:var(--zinc-600);font-weight:700;font-size:12px;padding:6px 10px;border-radius:7px;margin-top:8px}
+  .states{display:flex;gap:8px;flex-wrap:wrap}
+  .st{border:1px solid var(--zinc-200);background:#fff;color:var(--zinc-500);font-weight:700;font-size:13px;padding:8px 14px;border-radius:8px}
+  .st.is-current{background:var(--wa);color:#fff;border-color:var(--wa)}
+  .st:disabled{opacity:1;cursor:default}
+  .empty{text-align:center;color:var(--zinc-400);padding:60px 0;font-weight:700}
+</style>
+</head>
+<body>
+
+<div id="login" class="login">
+  <h1>Panel de pedidos</h1>
+  <input id="key" type="password" placeholder="Clave de acceso" autocomplete="off">
+  <button id="enter" class="btn btn-primary">Entrar</button>
+  <p id="loginErr" class="err" hidden>Clave incorrecta.</p>
+</div>
+
+<div id="app" hidden>
+  <header>
+    <span class="brand">GAMMA<span>MARKET</span></span>
+    <div class="head-actions">
+      <span id="count" class="badge">0</span>
+      <button id="reload" class="btn btn-ghost">Actualizar</button>
+      <button id="logout" class="btn btn-ghost">Salir</button>
+    </div>
+  </header>
+  <div class="wrap">
+    <div class="filters">
+      <button class="chip is-active" data-f="todos">Todos</button>
+      <button class="chip" data-f="preparacion">En preparación</button>
+      <button class="chip" data-f="enviado">Enviados</button>
+      <button class="chip" data-f="recibido">Recibidos</button>
+    </div>
+    <div id="list"></div>
+  </div>
+</div>
+
+<script>
+'use strict';
+const API = 'https://gamma-market-api.gammasg.workers.dev';
+const ESTADOS = ['preparacion','enviado','recibido'];
+const LABEL = {preparacion:'En preparación',enviado:'Enviado',recibido:'Recibido'};
+const money = (n) => '$' + Number(n).toFixed(2);
+let TOKEN = localStorage.getItem('gm_admin') || '';
+let ORDERS = [];
+let filter = 'todos';
+
+const $ = (s) => document.querySelector(s);
+function el(tag, attrs, ...kids){
+  const n = document.createElement(tag);
+  if(attrs) for(const k in attrs){ if(k==='class')n.className=attrs[k]; else if(k==='text')n.textContent=attrs[k]; else n.setAttribute(k,attrs[k]); }
+  for(const kid of kids){ if(kid==null)continue; n.append(kid.nodeType?kid:document.createTextNode(kid)); }
+  return n;
+}
+
+async function load(){
+  const r = await fetch(API + '/admin/orders', { headers: { Authorization: 'Bearer ' + TOKEN } });
+  if(r.status === 401){ logout(true); return; }
+  const data = await r.json();
+  ORDERS = data.orders || [];
+  render();
+}
+
+function normEstado(e){ return ESTADOS.includes(e) ? e : 'preparacion'; }
+
+function render(){
+  const list = $('#list'); list.replaceChildren();
+  const rows = ORDERS.filter((o) => filter === 'todos' || normEstado(o.estado) === filter);
+  $('#count').textContent = String(rows.length);
+  if(!rows.length){ list.append(el('p',{class:'empty',text:'No hay pedidos.'})); return; }
+
+  rows.forEach((o) => {
+    let items = [];
+    try { items = JSON.parse(o.items); } catch(e){}
+    const est = normEstado(o.estado);
+    const dir = [o.direccion, o.referencia, o.ciudad, o.provincia].filter(Boolean).join(', ');
+
+    const dataBox = el('div',{class:'o-data'},
+      el('div',{class:'row'}, el('span',null,el('b',null,'Cliente: '),o.nombre||'-'), el('span',null,el('b',null,'Tel: '),o.telefono||'-')),
+      el('div',null, el('b',null,'Dirección: '), dir || '-'),
+      el('div',null, el('b',null,'Email: '), o.email||'-'),
+    );
+    const copyBtn = el('button',{class:'o-copy',type:'button'},'Copiar dirección');
+    copyBtn.addEventListener('click',()=>{ navigator.clipboard.writeText([o.nombre,o.telefono,dir].filter(Boolean).join(' | ')); copyBtn.textContent='¡Copiado!'; setTimeout(()=>copyBtn.textContent='Copiar dirección',1500); });
+    dataBox.append(copyBtn);
+
+    const itemsBox = el('div',{class:'o-items'});
+    items.forEach((it)=> itemsBox.append(el('div',{text:'• '+it.name+(it.variant?' ('+it.variant+')':'')+' ×'+it.qty+' — '+money(it.price*it.qty)})));
+
+    const states = el('div',{class:'states'});
+    ESTADOS.forEach((s)=>{
+      const b = el('button',{class:'st'+(s===est?' is-current':''),type:'button'}, LABEL[s]);
+      if(s===est) b.disabled = true;
+      else b.addEventListener('click',()=> setEstado(o.id, s));
+      states.append(b);
+    });
+
+    list.append(el('div',{class:'order'},
+      el('div',{class:'o-top'}, el('span',{class:'o-id',text:'Pedido #'+o.id}), el('span',{class:'o-total',text:money(o.total)})),
+      el('div',{class:'o-date',text:o.created_at||''}),
+      dataBox, itemsBox, states,
+    ));
+  });
+}
+
+async function setEstado(id, estado){
+  const prev = ORDERS.find((o)=>o.id===id);
+  if(prev) prev.estado = estado; render(); // optimista
+  try{
+    const r = await fetch(API + '/admin/order/' + id + '/estado', {
+      method:'POST', headers:{ 'Content-Type':'application/json', Authorization:'Bearer '+TOKEN },
+      body: JSON.stringify({ estado }),
+    });
+    if(!r.ok) throw new Error();
+  }catch(e){ alert('No se pudo cambiar el estado. Reintentá.'); load(); }
+}
+
+function logout(bad){
+  TOKEN=''; localStorage.removeItem('gm_admin');
+  $('#app').hidden=true; $('#login').hidden=false;
+  $('#loginErr').hidden = !bad;
+  $('#key').value='';
+}
+function enter(){
+  const k = $('#key').value.trim();
+  if(!k) return;
+  TOKEN = k; localStorage.setItem('gm_admin', k);
+  $('#login').hidden=true; $('#app').hidden=false; $('#loginErr').hidden=true;
+  load();
+}
+
+$('#enter').addEventListener('click', enter);
+$('#key').addEventListener('keydown',(e)=>{ if(e.key==='Enter') enter(); });
+$('#reload').addEventListener('click', load);
+$('#logout').addEventListener('click', ()=>logout(false));
+document.querySelectorAll('.chip').forEach((c)=> c.addEventListener('click',()=>{
+  filter = c.dataset.f;
+  document.querySelectorAll('.chip').forEach((x)=>x.classList.toggle('is-active', x===c));
+  render();
+}));
+
+if(TOKEN){ $('#login').hidden=true; $('#app').hidden=false; load(); }
+</script>
+</body>
+</html>

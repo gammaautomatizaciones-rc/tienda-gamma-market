@@ -1,10 +1,8 @@
 'use strict';
 
-/* ================================================================
-   NUMERO DE WHATSAPP DE GAMMA MARKET (Ecuador). Solo digitos, sin + ni espacios.
-================================================================ */
-const WHATSAPP = '5493853010314'; // GAMMA MARKET
 const API = 'https://gamma-market-api.gammasg.workers.dev';
+const ESTADOS_ORDER = ['preparacion', 'enviado', 'recibido'];
+const ESTADO_LABEL = { preparacion: 'En preparación', enviado: 'Enviado', recibido: 'Recibido' };
 let authToken = localStorage.getItem('gm_token') || '';
 let currentUser = null;
 
@@ -111,8 +109,54 @@ function renderCart() {
   });
   $('#cartTotal').textContent = money(total);
 }
-function openCart() { $('#cart').hidden = false; $('#overlay').hidden = false; document.body.style.overflow = 'hidden'; }
+function openCart() { resetCartView(); $('#cart').hidden = false; $('#overlay').hidden = false; document.body.style.overflow = 'hidden'; }
 function closeCart() { $('#cart').hidden = true; $('#overlay').hidden = true; document.body.style.overflow = ''; }
+
+// ---------- Mis pedidos (tracking) ----------
+async function openMyOrders() {
+  $('#ordersModal').hidden = false; $('#ordersOverlay').hidden = false; document.body.style.overflow = 'hidden';
+  const list = $('#ordersList'); list.replaceChildren(el('p', { class: 'orders-loading', text: 'Cargando…' }));
+  try {
+    const r = await fetch(API + '/my-orders', { headers: { Authorization: 'Bearer ' + authToken } });
+    if (!r.ok) throw new Error();
+    const { orders } = await r.json();
+    renderOrders(orders || []);
+  } catch (e) {
+    list.replaceChildren(el('p', { class: 'orders-loading', text: 'No se pudieron cargar tus pedidos.' }));
+  }
+}
+function closeMyOrders() { $('#ordersModal').hidden = true; $('#ordersOverlay').hidden = true; document.body.style.overflow = ''; }
+
+function renderOrders(orders) {
+  const list = $('#ordersList'); list.replaceChildren();
+  if (!orders.length) { list.append(el('p', { class: 'orders-loading', text: 'Todavía no hiciste ningún pedido.' })); return; }
+  orders.forEach((o) => {
+    let items = [];
+    try { items = JSON.parse(o.items); } catch (e) { /* items corruptos: se ignora */ }
+    const est = ESTADOS_ORDER.includes(o.estado) ? o.estado : 'preparacion';
+    const stepIdx = ESTADOS_ORDER.indexOf(est);
+
+    const prods = el('div', { class: 'order-items' });
+    items.forEach((it) => prods.append(el('div', { class: 'order-item', text: it.name + (it.variant ? ' (' + it.variant + ')' : '') + ' ×' + it.qty })));
+
+    const track = el('div', { class: 'track' });
+    ESTADOS_ORDER.forEach((s, i) => {
+      track.append(el('div', { class: 'track-step' + (i <= stepIdx ? ' is-done' : '') },
+        el('span', { class: 'track-dot' }),
+        el('span', { class: 'track-label', text: ESTADO_LABEL[s] }),
+      ));
+    });
+
+    list.append(el('div', { class: 'order-card' },
+      el('div', { class: 'order-top' },
+        el('strong', { text: 'Pedido #' + o.id }),
+        el('span', { class: 'order-total', text: money(o.total) }),
+      ),
+      prods,
+      track,
+    ));
+  });
+}
 
 function fillProvincias() {
   const sel = document.querySelector('.checkout select[name="provincia"]');
@@ -137,27 +181,40 @@ async function confirmOrder() {
     direccion: f.get('direccion'), referencia: (f.get('referencia') || '').trim(),
   };
 
+  const err = $('#checkoutError'); err.hidden = true;
   const btn = $('#confirmBtn'); btn.disabled = true;
   try {
-    await fetch(API + '/order', {
+    const r = await fetch(API + '/order', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + authToken },
       body: JSON.stringify({ items, total, ...shipping }),
     });
-  } catch (e) { console.error('no se guardó el pedido en la cuenta', e); }
-  btn.disabled = false;
+    if (!r.ok) throw new Error('order ' + r.status);
+    cart.length = 0; renderCart();
+    showOrderOk();
+  } catch (e) {
+    console.error('no se guardó el pedido', e);
+    err.textContent = 'No se pudo enviar el pedido. Revisá tu conexión y reintentá.';
+    err.hidden = false;
+  } finally {
+    btn.disabled = false;
+  }
+}
 
-  let msg = '*NUEVO PEDIDO — GAMMA MARKET*\n\n*Productos:*\n';
-  items.forEach((it) => { msg += '- ' + it.name + (it.variant ? ' (' + it.variant + ')' : '') + ' x' + it.qty + ' — ' + money(it.price * it.qty) + '\n'; });
-  msg += '\n*Total: ' + money(total) + '* (pago contra entrega)\n\n*Datos del cliente:*\n';
-  msg += 'Nombre: ' + (currentUser.nombre || f.get('nombre')) + '\n';
-  msg += 'Email: ' + currentUser.email + '\n';
-  msg += 'Teléfono: ' + shipping.telefono + '\n';
-  msg += 'Provincia: ' + shipping.provincia + '\n';
-  msg += 'Ciudad: ' + shipping.ciudad + '\n';
-  msg += 'Dirección: ' + shipping.direccion + '\n';
-  if (shipping.referencia) msg += 'Referencia: ' + shipping.referencia + '\n';
-  window.open('https://wa.me/' + WHATSAPP + '?text=' + encodeURIComponent(msg), '_blank');
+// ---- vistas del carrito: pedido OK vs compra ----
+function showOrderOk() {
+  $('#cartItems').hidden = true;
+  $('#cartEmpty').hidden = true;
+  $('#checkout').hidden = true;
+  $('#checkoutError').hidden = true;
+  document.querySelector('.cart-foot').hidden = true;
+  $('#orderOk').hidden = false;
+}
+function resetCartView() {
+  $('#orderOk').hidden = true;
+  $('#cartItems').hidden = false;
+  document.querySelector('.cart-foot').hidden = false;
+  renderCart();
 }
 
 // ---------- Cuenta / auth ----------
@@ -223,7 +280,12 @@ $('#confirmBtn').addEventListener('click', confirmOrder);
 $('#search').addEventListener('input', (e) => { query = e.target.value.trim().toLowerCase(); renderGrid(); });
 
 // cuenta
-$('#accountBtn').addEventListener('click', () => { if (currentUser) logout(); else { showTab('login'); openAuth(false); } });
+$('#accountBtn').addEventListener('click', () => { if (currentUser) openMyOrders(); else { showTab('login'); openAuth(false); } });
+$('#ordersClose').addEventListener('click', closeMyOrders);
+$('#ordersOverlay').addEventListener('click', closeMyOrders);
+$('#logoutBtn').addEventListener('click', () => { logout(); closeMyOrders(); });
+$('#okMyOrders').addEventListener('click', () => { closeCart(); openMyOrders(); });
+$('#okKeep').addEventListener('click', closeCart);
 $('#authClose').addEventListener('click', closeAuth);
 $('#authOverlay').addEventListener('click', closeAuth);
 $('#tabLogin').addEventListener('click', () => showTab('login'));

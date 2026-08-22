@@ -194,3 +194,33 @@ a{color:inherit;text-decoration:none}
   .hero{padding:32px 0 30px}
   #accountName{display:none}
 }
+
+/* ---------- Pedido confirmado ---------- */
+.order-ok{text-align:center;padding:28px 8px}
+.order-ok .ok-check{width:64px;height:64px;margin:0 auto 16px;border-radius:999px;background:var(--wa);color:#fff;display:flex;align-items:center;justify-content:center}
+.order-ok .ok-check svg{width:34px;height:34px}
+.order-ok h3{font-weight:900;font-size:20px;margin-bottom:8px}
+.order-ok p{font-size:14px;color:var(--zinc-600);margin-bottom:20px}
+
+/* ---------- Mis pedidos ---------- */
+.orders-modal{max-height:min(80vh,640px);display:flex;flex-direction:column;padding-top:20px}
+.orders-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;padding-right:32px}
+.orders-head h2{font-weight:900;font-size:20px}
+.logout-btn{width:auto;margin:0;padding:8px 12px;font-size:12px}
+.orders-list{overflow-y:auto;display:flex;flex-direction:column;gap:14px}
+.orders-loading{color:var(--zinc-400);font-size:14px;text-align:center;padding:24px 0}
+.order-card{border:1px solid var(--zinc-200);border-radius:var(--radius);padding:14px}
+.order-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.order-top strong{font-weight:900;font-size:15px}
+.order-total{font-weight:900;font-size:16px}
+.order-items{display:flex;flex-direction:column;gap:2px;margin-bottom:14px}
+.order-item{font-size:13px;color:var(--zinc-600)}
+
+/* tracking de 3 estados */
+.track{display:flex;align-items:flex-start;justify-content:space-between;position:relative;margin-top:6px}
+.track::before{content:"";position:absolute;top:9px;left:12%;right:12%;height:2px;background:var(--zinc-200);z-index:0}
+.track-step{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:6px;flex:1}
+.track-dot{width:20px;height:20px;border-radius:999px;background:var(--white);border:2px solid var(--zinc-200)}
+.track-label{font-size:11px;font-weight:700;color:var(--zinc-400);text-align:center}
+.track-step.is-done .track-dot{background:var(--wa);border-color:var(--wa)}
+.track-step.is-done .track-label{color:var(--zinc-900)}

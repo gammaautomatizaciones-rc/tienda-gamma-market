@@ -113,6 +113,16 @@
           <input name="referencia" type="text" placeholder="Casa, color, entre calles…">
         </label>
       </form>
+
+      <div id="orderOk" class="order-ok" hidden>
+        <div class="ok-check">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+        <h3>¡Pedido recibido!</h3>
+        <p>Lo estamos preparando. Te contactamos para coordinar la entrega y pagas cuando lo recibes.</p>
+        <button id="okMyOrders" class="wa-btn" type="button">Ver el estado de mi pedido</button>
+        <button id="okKeep" class="ghost-btn" type="button">Seguir comprando</button>
+      </div>
     </div>
 
     <div class="cart-foot">
@@ -121,11 +131,9 @@
         <strong id="cartTotal">$0.00</strong>
       </div>
       <p class="cod-note">Pagas en efectivo cuando recibes el pedido.</p>
+      <p id="checkoutError" class="auth-error" hidden></p>
       <button id="keepShopping" class="ghost-btn" type="button">Seguir comprando</button>
-      <button id="confirmBtn" class="wa-btn" type="button" disabled>
-        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.5 14.4c-.3-.2-1.7-.8-2-.9-.3-.1-.5-.2-.7.2-.2.3-.7.9-.9 1.1-.2.2-.3.2-.6.1-.3-.2-1.2-.5-2.3-1.4-.9-.8-1.4-1.7-1.6-2-.2-.3 0-.5.1-.6l.5-.5c.1-.2.2-.3.3-.5.1-.2 0-.4 0-.5 0-.2-.7-1.6-.9-2.2-.2-.6-.5-.5-.7-.5H8c-.2 0-.5.1-.7.3-.2.3-.9.9-.9 2.2 0 1.3.9 2.5 1.1 2.7.1.2 1.8 2.8 4.4 3.9.6.3 1.1.4 1.5.5.6.2 1.2.2 1.6.1.5-.1 1.7-.7 1.9-1.3.2-.7.2-1.2.2-1.3-.1-.2-.3-.2-.6-.4z"/><path d="M12 2a10 10 0 0 0-8.6 15L2 22l5.1-1.3A10 10 0 1 0 12 2zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2z"/></svg>
-        Confirmar pedido por WhatsApp
-      </button>
+      <button id="confirmBtn" class="wa-btn" type="button" disabled>Confirmar pedido</button>
     </div>
   </aside>
 
@@ -155,6 +163,19 @@
       <p id="registerError" class="auth-error" hidden></p>
       <button class="wa-btn auth-submit" type="submit">Crear cuenta</button>
     </form>
+  </div>
+
+  <!-- Modal Mis pedidos -->
+  <div id="ordersOverlay" class="overlay" hidden></div>
+  <div id="ordersModal" class="auth-modal orders-modal" role="dialog" aria-label="Mis pedidos" hidden>
+    <button id="ordersClose" class="icon-btn auth-close" type="button" aria-label="Cerrar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+    <div class="orders-head">
+      <h2>Mis pedidos</h2>
+      <button id="logoutBtn" class="ghost-btn logout-btn" type="button">Cerrar sesión</button>
+    </div>
+    <div id="ordersList" class="orders-list"></div>
   </div>
 
   <script src="app.js"></script>
