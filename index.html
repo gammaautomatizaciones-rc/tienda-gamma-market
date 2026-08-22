@@ -78,64 +78,89 @@
     </div>
   </footer>
 
-  <!-- Carrito / Checkout -->
+  <!-- Modal de compra (centrado, 2 pasos) -->
   <div id="overlay" class="overlay" hidden></div>
-  <aside id="cart" class="cart" aria-label="Carrito de compras" hidden>
-    <div class="cart-head">
-      <h2 id="cartTitle">Tu pedido</h2>
-      <button id="closeCart" class="icon-btn" type="button" aria-label="Cerrar">
+  <div id="cartModal" class="cart-modal" role="dialog" aria-label="Tu compra" hidden>
+    <div class="cm-head">
+      <div class="cm-steps">
+        <div class="cm-step is-active" data-step="1"><span class="cm-num">1</span><span class="cm-label">Tu pedido</span></div>
+        <div class="cm-sep"></div>
+        <div class="cm-step" data-step="2"><span class="cm-num">2</span><span class="cm-label">Envío</span></div>
+      </div>
+      <button id="closeCart" class="icon-btn cm-close" type="button" aria-label="Cerrar">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
 
-    <div class="cart-body">
-      <div id="cartItems" class="cart-items"></div>
-      <p id="cartEmpty" class="cart-empty">Todavía no agregaste nada.</p>
+    <div class="cm-scroll">
+      <!-- PASO 1: revisar el pedido -->
+      <div id="step1" class="cm-panel">
+        <div id="cartItems" class="cart-items"></div>
+        <p id="cartEmpty" class="cart-empty">Todavía no agregaste nada.</p>
+      </div>
 
-      <form id="checkout" class="checkout" hidden>
-        <h3>Datos para el envío</h3>
-        <label>Nombre y apellido
-          <input name="nombre" type="text" required autocomplete="name">
-        </label>
-        <label>Teléfono (WhatsApp)
-          <input name="telefono" type="tel" required inputmode="tel" placeholder="09XXXXXXXX" autocomplete="tel">
-        </label>
-        <label>Provincia
-          <select name="provincia" required></select>
-        </label>
-        <label>Ciudad
-          <input name="ciudad" type="text" required autocomplete="address-level2">
-        </label>
-        <label>Dirección
-          <input name="direccion" type="text" required autocomplete="street-address" placeholder="Calle, número">
-        </label>
-        <label>Referencia (opcional)
-          <input name="referencia" type="text" placeholder="Casa, color, entre calles…">
-        </label>
-      </form>
+      <!-- PASO 2: datos de envío -->
+      <div id="step2" class="cm-panel" hidden>
+        <div id="savedAddr" class="saved-addr" hidden>
+          <span class="sa-badge">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            Enviar a esta dirección
+          </span>
+          <p class="sa-name"></p>
+          <p class="sa-line"></p>
+          <p class="sa-phone"></p>
+          <button id="changeAddr" class="link-btn" type="button">Quiero cambiar la dirección</button>
+        </div>
 
+        <form id="checkout" class="checkout-grid" hidden>
+          <label class="f-nombre">Nombre y apellido
+            <input name="nombre" type="text" required autocomplete="name">
+          </label>
+          <label class="f-tel">Teléfono (WhatsApp)
+            <input name="telefono" type="tel" required inputmode="tel" placeholder="09XXXXXXXX" autocomplete="tel">
+          </label>
+          <label class="f-prov">Provincia
+            <select name="provincia" required></select>
+          </label>
+          <label class="f-ciudad">Ciudad
+            <input name="ciudad" type="text" required autocomplete="address-level2">
+          </label>
+          <label class="f-dir">Dirección
+            <input name="direccion" type="text" required autocomplete="street-address" placeholder="Calle, número">
+          </label>
+          <label class="f-ref">Referencia (opcional)
+            <input name="referencia" type="text" placeholder="Casa, color, entre calles…">
+          </label>
+        </form>
+
+        <p id="ctaAccount" class="cta-account">¿Querés seguir el estado de tu pedido y no volver a cargar tus datos? <button id="ctaAccountBtn" class="link-btn" type="button">Creá tu cuenta</button></p>
+      </div>
+
+      <!-- ÉXITO -->
       <div id="orderOk" class="order-ok" hidden>
         <div class="ok-check">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
         </div>
         <h3>¡Pedido recibido!</h3>
         <p>Lo estamos preparando. Te contactamos para coordinar la entrega y pagas cuando lo recibes.</p>
-        <button id="okMyOrders" class="wa-btn" type="button">Ver el estado de mi pedido</button>
+        <button id="okMyOrders" class="cta-btn" type="button">Ver el estado de mi pedido</button>
         <button id="okKeep" class="ghost-btn" type="button">Seguir comprando</button>
       </div>
     </div>
 
-    <div class="cart-foot">
+    <div class="cm-foot" id="cmFoot">
       <div class="total-row">
         <span>Total</span>
         <strong id="cartTotal">$0.00</strong>
       </div>
       <p class="cod-note">Pagas en efectivo cuando recibes el pedido.</p>
       <p id="checkoutError" class="auth-error" hidden></p>
-      <button id="keepShopping" class="ghost-btn" type="button">Seguir comprando</button>
-      <button id="confirmBtn" class="wa-btn" type="button" disabled>Confirmar pedido</button>
+      <div class="cm-actions">
+        <button id="backStep" class="ghost-btn" type="button" hidden>Volver</button>
+        <button id="primaryBtn" class="cta-btn" type="button" disabled>Continuar</button>
+      </div>
     </div>
-  </aside>
+  </div>
 
   <!-- Modal de cuenta (login / registro) -->
   <div id="authOverlay" class="overlay" hidden></div>

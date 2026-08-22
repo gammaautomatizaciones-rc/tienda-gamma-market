@@ -11,6 +11,11 @@ const PROVINCIAS = ['Azuay','Bolívar','Cañar','Carchi','Chimborazo','Cotopaxi'
 let PRODUCTS = [];
 let query = '';
 const cart = []; // { id, variant, qty }
+let step = 1;                 // paso del modal de compra (1 pedido, 2 envío)
+const ADDR_KEY = 'gm_addr';   // dirección guardada en el dispositivo (sin cuenta)
+
+const getSavedAddr = () => { try { return JSON.parse(localStorage.getItem(ADDR_KEY) || 'null'); } catch (e) { return null; } };
+const saveAddr = (a) => localStorage.setItem(ADDR_KEY, JSON.stringify(a));
 
 const $ = (s) => document.querySelector(s);
 const money = (n) => '$' + Number(n).toFixed(2);
@@ -85,8 +90,6 @@ function renderCart() {
   const count = cart.reduce((a, c) => a + c.qty, 0);
   const cc = $('#cartCount'); cc.textContent = String(count); cc.hidden = count === 0;
   $('#cartEmpty').hidden = cart.length > 0;
-  $('#checkout').hidden = cart.length === 0;
-  $('#confirmBtn').disabled = cart.length === 0;
 
   let total = 0;
   cart.forEach((c, i) => {
@@ -97,20 +100,74 @@ function renderCart() {
       c.variant ? el('div', { class: 'ci-meta', text: c.variant }) : null,
       el('div', { class: 'ci-price', text: money(p.price * c.qty) }),
     );
+    const drop = () => { renderCart(); if (!cart.length && step === 2) goStep(1); };
     const minus = el('button', { type: 'button', 'aria-label': 'Restar' }); minus.append(ICON.minus());
-    minus.addEventListener('click', () => { c.qty--; if (c.qty <= 0) cart.splice(i, 1); renderCart(); });
+    minus.addEventListener('click', () => { c.qty--; if (c.qty <= 0) cart.splice(i, 1); drop(); });
     const plus = el('button', { type: 'button', 'aria-label': 'Sumar' }); plus.append(ICON.plus());
     plus.addEventListener('click', () => { c.qty++; renderCart(); });
     const rm = el('button', { class: 'ci-remove', type: 'button', 'aria-label': 'Quitar' }); rm.append(ICON.trash());
-    rm.addEventListener('click', () => { cart.splice(i, 1); renderCart(); });
+    rm.addEventListener('click', () => { cart.splice(i, 1); drop(); });
     const ciImg = el('div', { class: 'ci-img' });
     if (p.img) ciImg.append(el('img', { src: p.img, alt: p.name }));
     box.append(el('div', { class: 'ci' }, ciImg, info, el('div', { class: 'qty' }, minus, el('span', { text: String(c.qty) }), plus), rm));
   });
   $('#cartTotal').textContent = money(total);
+  if (step === 1) $('#primaryBtn').disabled = cart.length === 0;
 }
-function openCart() { resetCartView(); $('#cart').hidden = false; $('#overlay').hidden = false; document.body.style.overflow = 'hidden'; }
-function closeCart() { $('#cart').hidden = true; $('#overlay').hidden = true; document.body.style.overflow = ''; }
+
+// ---- Modal de compra: pasos ----
+function openCart() {
+  $('#orderOk').hidden = true;
+  $('#cmFoot').hidden = false;
+  renderCart();
+  goStep(1);
+  $('#cartModal').hidden = false; $('#overlay').hidden = false; document.body.style.overflow = 'hidden';
+}
+function closeCart() { $('#cartModal').hidden = true; $('#overlay').hidden = true; document.body.style.overflow = ''; }
+
+function goStep(n) {
+  step = n;
+  $('#step1').hidden = n !== 1;
+  $('#step2').hidden = n !== 2;
+  document.querySelectorAll('.cm-step').forEach((s) => s.classList.toggle('is-active', Number(s.dataset.step) === n));
+  document.querySelector('.cm-step[data-step="1"]').classList.toggle('is-done', n > 1);
+  $('#backStep').hidden = n === 1;
+  $('#checkoutError').hidden = true;
+  const primary = $('#primaryBtn');
+  if (n === 1) {
+    primary.textContent = 'Continuar';
+    primary.disabled = cart.length === 0;
+  } else {
+    primary.textContent = 'Confirmar pedido';
+    primary.disabled = false;
+    showStep2();
+  }
+}
+
+// paso 2: dirección guardada en el dispositivo → card; si no hay → formulario
+function showStep2() {
+  const saved = getSavedAddr();
+  const hasSaved = !!(saved && saved.direccion);
+  $('#savedAddr').hidden = !hasSaved;
+  $('#checkout').hidden = hasSaved;
+  if (hasSaved) {
+    document.querySelector('.sa-name').textContent = saved.nombre || '';
+    document.querySelector('.sa-line').textContent = [saved.direccion, saved.referencia, saved.ciudad, saved.provincia].filter(Boolean).join(', ');
+    document.querySelector('.sa-phone').textContent = saved.telefono ? 'Tel: ' + saved.telefono : '';
+  } else {
+    prefillCheckout();
+  }
+  $('#ctaAccount').hidden = !!currentUser; // si ya tiene cuenta, no ofrezco crearla
+}
+function useNewAddr() {
+  $('#savedAddr').hidden = true;
+  $('#checkout').hidden = false;
+  $('#checkout').reset();
+}
+function primaryAction() {
+  if (step === 1) { if (cart.length) goStep(2); }
+  else confirmOrder();
+}
 
 // ---------- Mis pedidos (tracking) ----------
 async function openMyOrders() {
@@ -159,16 +216,30 @@ function renderOrders(orders) {
 }
 
 function fillProvincias() {
-  const sel = document.querySelector('.checkout select[name="provincia"]');
+  const sel = document.querySelector('#checkout select[name="provincia"]');
   sel.append(el('option', { value: '', disabled: '', selected: '', text: 'Elige tu provincia' }));
   PROVINCIAS.forEach((pr) => sel.append(el('option', { value: pr, text: pr })));
 }
 
 async function confirmOrder() {
-  if (!currentUser) { openAuth(true); return; } // hay que estar logueado para comprar
-  const form = $('#checkout');
-  if (!form.reportValidity()) return;
-  const f = new FormData(form);
+  const err = $('#checkoutError'); err.hidden = true;
+  // datos de envío: de la card guardada (si está visible) o del formulario
+  let shipping;
+  if ($('#savedAddr').hidden === false) {
+    shipping = getSavedAddr();
+  } else {
+    const form = $('#checkout');
+    if (!form.reportValidity()) return;
+    const f = new FormData(form);
+    shipping = {
+      nombre: (f.get('nombre') || '').trim(), telefono: (f.get('telefono') || '').trim(),
+      provincia: f.get('provincia') || '', ciudad: (f.get('ciudad') || '').trim(),
+      direccion: (f.get('direccion') || '').trim(), referencia: (f.get('referencia') || '').trim(),
+    };
+  }
+  if (!shipping || !shipping.nombre || !shipping.telefono || !shipping.direccion) {
+    err.textContent = 'Completá tus datos de envío.'; err.hidden = false; return;
+  }
 
   let total = 0; const items = [];
   cart.forEach((c) => {
@@ -176,45 +247,32 @@ async function confirmOrder() {
     total += p.price * c.qty;
     items.push({ name: p.name, variant: c.variant || null, qty: c.qty, price: p.price });
   });
-  const shipping = {
-    telefono: f.get('telefono'), provincia: f.get('provincia'), ciudad: f.get('ciudad'),
-    direccion: f.get('direccion'), referencia: (f.get('referencia') || '').trim(),
-  };
+  if (!items.length) return;
 
-  const err = $('#checkoutError'); err.hidden = true;
-  const btn = $('#confirmBtn'); btn.disabled = true;
+  const btn = $('#primaryBtn'); btn.disabled = true; btn.textContent = 'Enviando…';
   try {
-    const r = await fetch(API + '/order', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + authToken },
-      body: JSON.stringify({ items, total, ...shipping }),
-    });
+    const headers = { 'Content-Type': 'application/json' };
+    if (authToken) headers.Authorization = 'Bearer ' + authToken;
+    const r = await fetch(API + '/order', { method: 'POST', headers, body: JSON.stringify({ items, total, ...shipping }) });
     if (!r.ok) throw new Error('order ' + r.status);
+    saveAddr(shipping); // queda predeterminada para el próximo envío
     cart.length = 0; renderCart();
     showOrderOk();
   } catch (e) {
     console.error('no se guardó el pedido', e);
     err.textContent = 'No se pudo enviar el pedido. Revisá tu conexión y reintentá.';
     err.hidden = false;
-  } finally {
-    btn.disabled = false;
+    btn.disabled = false; btn.textContent = 'Confirmar pedido';
   }
 }
 
-// ---- vistas del carrito: pedido OK vs compra ----
 function showOrderOk() {
-  $('#cartItems').hidden = true;
-  $('#cartEmpty').hidden = true;
-  $('#checkout').hidden = true;
-  $('#checkoutError').hidden = true;
-  document.querySelector('.cart-foot').hidden = true;
+  $('#step1').hidden = true;
+  $('#step2').hidden = true;
+  $('#cmFoot').hidden = true;
+  document.querySelectorAll('.cm-step').forEach((s) => s.classList.remove('is-active'));
+  $('#okMyOrders').hidden = !currentUser; // sin cuenta no hay tracking online
   $('#orderOk').hidden = false;
-}
-function resetCartView() {
-  $('#orderOk').hidden = true;
-  $('#cartItems').hidden = false;
-  document.querySelector('.cart-foot').hidden = false;
-  renderCart();
 }
 
 // ---------- Cuenta / auth ----------
@@ -223,15 +281,15 @@ function updateAuthUI() {
   name.textContent = currentUser ? (currentUser.nombre || 'Mi cuenta').split(' ')[0] : 'Ingresar';
 }
 function prefillCheckout() {
-  if (!currentUser) return;
   const form = $('#checkout'); if (!form) return;
-  const set = (n, v) => { const el = form.querySelector('[name="' + n + '"]'); if (el && v && !el.value) el.value = v; };
-  set('nombre', currentUser.nombre); set('telefono', currentUser.telefono);
-  set('provincia', currentUser.provincia); set('ciudad', currentUser.ciudad);
-  set('direccion', currentUser.direccion); set('referencia', currentUser.referencia);
+  const src = getSavedAddr() || currentUser;
+  if (!src) return;
+  const set = (n, v) => { const elx = form.querySelector('[name="' + n + '"]'); if (elx && v && !elx.value) elx.value = v; };
+  set('nombre', src.nombre); set('telefono', src.telefono);
+  set('provincia', src.provincia); set('ciudad', src.ciudad);
+  set('direccion', src.direccion); set('referencia', src.referencia);
 }
-function openAuth(pending) {
-  window.__authPending = !!pending;
+function openAuth() {
   $('#authModal').hidden = false; $('#authOverlay').hidden = false; document.body.style.overflow = 'hidden';
 }
 function closeAuth() {
@@ -247,8 +305,8 @@ function showTab(which) {
 function onAuthSuccess(data) {
   authToken = data.token; currentUser = data.user;
   localStorage.setItem('gm_token', authToken);
-  updateAuthUI(); closeAuth(); prefillCheckout();
-  if (window.__authPending) { window.__authPending = false; openCart(); }
+  updateAuthUI(); closeAuth();
+  if (window.__afterAuth) { const fn = window.__afterAuth; window.__afterAuth = null; fn(); }
 }
 function logout() {
   authToken = ''; currentUser = null; localStorage.removeItem('gm_token'); updateAuthUI();
@@ -274,9 +332,11 @@ async function loadSession() {
 // ---- Init ----
 $('#cartBtn').addEventListener('click', openCart);
 $('#closeCart').addEventListener('click', closeCart);
-$('#keepShopping').addEventListener('click', closeCart);
 $('#overlay').addEventListener('click', closeCart);
-$('#confirmBtn').addEventListener('click', confirmOrder);
+$('#primaryBtn').addEventListener('click', primaryAction);
+$('#backStep').addEventListener('click', () => goStep(1));
+$('#changeAddr').addEventListener('click', useNewAddr);
+$('#ctaAccountBtn').addEventListener('click', () => { window.__afterAuth = () => { openCart(); goStep(2); }; showTab('register'); openAuth(false); });
 $('#search').addEventListener('input', (e) => { query = e.target.value.trim().toLowerCase(); renderGrid(); });
 
 // cuenta
